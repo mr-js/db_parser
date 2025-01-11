@@ -1,0 +1,16 @@
+terms_required:
+ИВАНОВ ИВАН
+ИВАН ИВАНОВ
+IVANOV IVAN
+IVAN IVANOV
+terms_removed:
+
+
+terms_negatives:
+
+
+terms_positives:
+
+
+
+{'00000000 0 IVAN IVANOV IVANOV@YANDEX.RU PASSWORD ', '00000000 0 ИВАН ИВАНОВ IVANOV@YANDEX.RU PASSWORD '}
