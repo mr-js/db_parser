@@ -1,2 +1,2 @@
 [COMMON]
-DB_PATH = 'C:\Test\db'
+DB_PATH = '~/Downloads/db'

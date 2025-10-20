@@ -1,4 +1,5 @@
 from pathlib import Path
+from enum import Enum
 import os
 from urllib.parse import unquote
 from transliterate import translit
@@ -9,11 +10,16 @@ import tomllib
 
 DEMO = False
 CPU_CORES = os.cpu_count()
+class SearchType(Enum):
+    NAME = 1
+    PHONE = 2
+    EMAIL = 3
+    BIRTHDAY = 4
 
 
-def search(filename, terms_required, terms_removed, terms_negatives, terms_positives):
+def request(filename, terms_required, terms_removed, terms_negatives, terms_positives):
     items = set(unquote(item) for item in Path(filename).read_text('utf-8').replace(',', ' ').upper().split('\n'))
-    items_filter_all = lambda items, terms: set(filter(lambda item: item if all(set(map(lambda term: (term in item or term.replace(' ', '_') in item), terms))) else None, items))
+    # items_filter_all = lambda items, terms: set(filter(lambda item: item if all(set(map(lambda term: (term in item or term.replace(' ', '_') in item), terms))) else None, items))
     items_filter_any = lambda items, terms: set(filter(lambda item: item if any(set(map(lambda term: (term in item or term.replace(' ', '_') in item), terms))) else None, items))
     terms_filter     = lambda terms: set(filter(None, terms.split('\n'))) if len(set(filter(None, terms.split('\n')))) != 0 else {}
     terms_required   = terms_filter(terms_required); terms_removed = terms_filter(terms_removed); terms_negatives = terms_filter(terms_negatives); terms_positives = terms_filter(terms_positives)
@@ -25,98 +31,87 @@ def search(filename, terms_required, terms_removed, terms_negatives, terms_posit
     return items_result
 
 
-def request(terms_required, terms_removed='\n', terms_negatives='\n', terms_positives='\n'):
-    summary = f'terms_required:\n{terms_required}\nterms_removed:\n{terms_removed}\nterms_negatives:\n{terms_negatives}\nterms_positives:\n{terms_positives}\n\n'
-    print(summary)
+def search(terms_required, terms_removed='\n', terms_negatives='\n', terms_positives='\n'):
     print(f'{CPU_CORES=}')
-    data = tomllib.loads(Path('db_parser.toml').read_text('utf-8'))
-    root = data['COMMON']['DB_PATH']
+    settings = tomllib.loads(Path('db_parser.toml').read_text('utf-8'))
+    root = os.path.expanduser(settings['COMMON']['DB_PATH'])
+    data = {}
     for folder in [x for x in Path(root).iterdir() if x.is_dir()]:
-        data = []
-        print(f'CURRENT DB: {folder}')
+        data[folder.name] = []
+        print(f'CURRENT DB: {folder.name}')
         db_chunks_counter = 0 
         with ProcessPoolExecutor(CPU_CORES) as executor:
             futures = []
-            for file in [x for x in Path(root).joinpath(folder).iterdir() if x.is_file()]:
+            for file in [x for x in folder.iterdir() if x.is_file()]:
                 db_chunks_counter += 1
                 if DEMO and db_chunks_counter > 3:
                     break
-                filename = os.path.join(root, folder, file)
-                future = executor.submit(search, filename, terms_required, terms_removed, terms_negatives, terms_positives)
+                filename = os.path.join(folder, file)
+                future = executor.submit(request, filename, terms_required, terms_removed, terms_negatives, terms_positives)
                 futures.append(future)
             for future in futures:
                 result = future.result()
                 if len(result) > 0:
-                    summary += f'{result}\n'
-    Path('report.txt').write_text(summary, 'utf-8')
+                    data[folder.name].append(result)
+    return data
 
-
-def find_by_name(name):
-    print(f'FIND BY NAME: {name}')
-    name_parts = name.split(' ')
-    name_len = len(name_parts)
-    match name_len:
-        case 1:
-            terms_required = ' '.join(name_parts) + '\n' + translit(' '.join(name_parts), 'ru', True)
-        case 2:
-            terms_required = ' '.join(name_parts) + '\n' + ' '.join(name_parts[::-1])
-            terms_required += '\n'
-            terms_required += translit(' '.join(name_parts), 'ru', True) + '\n' + translit(' '.join(name_parts[::-1]), 'ru', True)
-        case 3:
-            terms_required = ' '.join(name_parts) + '\n' + translit(' '.join(name_parts), 'ru', True)
-        case _:
-            terms_required = ' '.join(name_parts)
-    terms_required = terms_required.upper()
-    request(terms_required)
-
-
-def find_by_phone(phone):
-    print(f'FIND BY PHONE: {phone}')
-    phone_number = phone.replace('(', '').replace(')', '').replace('-', '').replace(' ', '').strip()
-    if phone_number.startswith('+'):
-        phone_number = phone_number[1:]
-    terms_required = phone_number.upper()
-    request(terms_required)
-
-
-def find_by_email(email):
-    print(f'FIND BY EMAIL: {email}')
-    email = email.replace(' ', '').strip()
-    if '@' not in email and '.' not in email:
-        ...
-    terms_required = email.upper()
-    request(terms_required)
-
-
-def find_by_birthday(birthday):
-    print(f'FIND BY BIRTHDAY: {birthday}')
-    phone_number = birthday.replace(',', '.').replace(' ', '').strip()
-    if '.' not in birthday:
-        ...
-    terms_required = birthday.upper()
-    request(terms_required)
 
 
 if __name__ == '__main__':
     while(True):
         print('\nSearch value: ')
-        search_value = input()
+        search_value = input().strip()
         search_type = -1
-        while (search_type < 0 or search_type > 4):
-            print('Search type: 1 - by Name, 2 - by Phone, 3 - by Email, 4 - by Birthday')
-            search_type = int(input())
+        search_promt = f"Search type: {', '.join([f'{st.value} - by {st.name}' for st in SearchType])}"
+        while (True):
+            print(search_promt)
+            try:
+                search_type = SearchType(int(input().strip()))
+            except:
+                break
             start_time = time.time()
+            print(f'FIND "{search_value}" BY {search_type.name}')
             match search_type:
-                case 1:
-                    find_by_name(search_value)
-                case 2:
-                    find_by_phone(search_value)
-                case 3:
-                    find_by_email(search_value)
-                case 4:
-                    find_by_birthday(search_value)
+                case SearchType.NAME:
+                    name_parts = search_value.split(' ')
+                    name_len = len(name_parts)
+                    match name_len:
+                        case 1:
+                            terms_required = ' '.join(name_parts) + '\n' + translit(' '.join(name_parts), 'ru', True)
+                        case 2:
+                            terms_required = ' '.join(name_parts) + '\n' + ' '.join(name_parts[::-1])
+                            terms_required += '\n'
+                            terms_required += translit(' '.join(name_parts), 'ru', True) + '\n' + translit(' '.join(name_parts[::-1]), 'ru', True)
+                        case 3:
+                            terms_required = ' '.join(name_parts) + '\n' + translit(' '.join(name_parts), 'ru', True)
+                        case _:
+                            terms_required = ' '.join(name_parts)
+                    terms_required = terms_required.upper()
+                case SearchType.PHONE:
+                    phone = search_value.replace('(', '').replace(')', '').replace('-', '').replace(' ', '').strip()
+                    if phone.startswith('+'):
+                        phone = phone[1:]
+                    terms_required = phone.upper()
+                case SearchType.EMAIL:
+                    email = search_value.replace(' ', '').strip()
+                    if '@' not in email and '.' not in email:
+                        ...
+                    terms_required = email.upper()
+                case SearchType.BIRTHDAY:
+                    birthday = search_value.replace(',', '.').replace(' ', '').strip()
+                    if '.' not in birthday:
+                        ...
+                    terms_required = birthday.upper()
                 case _:
-                    ...
+                    continue
+            summary = f'search_type: {search_type.name}\nsearch_values: {terms_required.replace(chr(10), ", ")}\n\n'
+            print(summary)
+            result = search(terms_required)
+            summary += '\n'.join(f'{k}:\n{chr(10).join(chr(10).join(i) for i in v)}' for k, v in result.items() if v != [])
+            summary = f'{80*"*"}\n{summary}\n{80*"*"}\n'
+            print(summary)
+            with open('report.txt', '+a', -1, 'utf-8') as f:
+                f.write(summary)
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f'Finished at: {round(elapsed_time)} seconds')

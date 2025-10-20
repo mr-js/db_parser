@@ -1,16 +1,9 @@
-terms_required:
-ИВАНОВ ИВАН
-ИВАН ИВАНОВ
-IVANOV IVAN
-IVAN IVANOV
-terms_removed:
+********************************************************************************
+search_type: NAME search_values: ИВАНОВ ИВАН, ИВАН ИВАНОВ, IVANOV IVAN, IVAN IVANOV
 
 
-terms_negatives:
+DB_NAME:
+00000000 0 IVAN IVANOV IVANOV@YANDEX.RU PASSWORD
+00000000 0 ИВАН ИВАНОВ IVANOV.I@MAIL.RU PASSWORD
 
-
-terms_positives:
-
-
-
-{'00000000 0 IVAN IVANOV IVANOV@YANDEX.RU PASSWORD ', '00000000 0 ИВАН ИВАНОВ IVANOV@YANDEX.RU PASSWORD '}
+********************************************************************************
